@@ -11,6 +11,7 @@
 (define-constant ERR_INSUFFICIENT_AMOUNT (err u406))
 (define-constant ERR_STILL_LOCKED (err u407))
 (define-constant ERR_NO_DEPOSIT (err u408))
+(define-constant ERR_INSUFFICIENT_WELSH (err u409))
 
 ;; Lock period (12 months = ~52,560 blocks)
 (define-constant LOCK_PERIOD u52560)
@@ -18,6 +19,8 @@
 ;; Data vars
 (define-data-var welsh-depositor (optional principal) none)
 (define-data-var creation-block uint u0)
+(define-data-var initial-welsh-amount uint u0)
+(define-data-var welsh-used-for-lp uint u0)
 (define-data-var total-lp-tokens uint u0)
 
 ;; Track individual LP contributions
@@ -37,6 +40,7 @@
     ;; Set state
     (var-set welsh-depositor (some tx-sender))
     (var-set creation-block burn-block-height)
+    (var-set initial-welsh-amount welsh-amount)
     
     (print {
       type: "welsh-pool-initialized",
@@ -59,27 +63,32 @@
     ;; Get quote to determine Welsh needed
     (let ((lp-quote (unwrap-panic (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool quote sbtc-amount (some 0x02))))
           (welsh-needed (get dy lp-quote))
+          (available-welsh (- (var-get initial-welsh-amount) (var-get welsh-used-for-lp)))
           (lp-result (try! (as-contract (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool add-liquidity sbtc-amount))))
           (lp-tokens-received (get dk lp-result))
-          (current-lp (default-to u0 (map-get? user-lp-tokens tx-sender)))
-          )
-        
-          (map-set user-lp-tokens tx-sender (+ current-lp lp-tokens-received))
-          (var-set total-lp-tokens (+ (var-get total-lp-tokens) lp-tokens-received))
-          
-          (print {
-            type: "community-lp-deposit",
-            user: tx-sender,
-            sbtc-in: sbtc-amount,
-            welsh-used: welsh-needed,
-            lp-tokens: lp-tokens-received,
-            unlock-block: (+ (var-get creation-block) LOCK_PERIOD)
-          })
-          
-          (ok lp-tokens-received)
-        )
-      )
+          (current-lp (default-to u0 (map-get? user-lp-tokens tx-sender))))
+      
+      ;; Check if enough Welsh available
+      (asserts! (>= available-welsh welsh-needed) ERR_INSUFFICIENT_WELSH)
+      
+      ;; Update tracking
+      (map-set user-lp-tokens tx-sender (+ current-lp lp-tokens-received))
+      (var-set total-lp-tokens (+ (var-get total-lp-tokens) lp-tokens-received))
+      (var-set welsh-used-for-lp (+ (var-get welsh-used-for-lp) welsh-needed))
+      
+      (print {
+        type: "community-lp-deposit",
+        user: tx-sender,
+        sbtc-in: sbtc-amount,
+        welsh-used: welsh-needed,
+        lp-tokens: lp-tokens-received,
+        unlock-block: (+ (var-get creation-block) LOCK_PERIOD)
+      })
+      
+      (ok lp-tokens-received)
     )
+  )
+)
 
 ;; --- Withdrawals (after lock period) ---
 
@@ -113,8 +122,8 @@
     (asserts! (>= burn-block-height unlock-block) ERR_STILL_LOCKED)
     (asserts! (is-eq (some tx-sender) (var-get welsh-depositor)) ERR_UNAUTHORIZED)
     
-    ;; Transfer any remaining Welsh to depositor
-    (let ((remaining-welsh (unwrap-panic (contract-call? 'SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token get-balance CONTRACT))))
+    ;; Calculate remaining Welsh (initial - used for LP)
+    (let ((remaining-welsh (- (var-get initial-welsh-amount) (var-get welsh-used-for-lp))))
       
       (and (> remaining-welsh u0)
            (try! (as-contract (contract-call? 'SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token 
@@ -138,8 +147,10 @@
     creation-block: (var-get creation-block),
     unlock-block: (+ (var-get creation-block) LOCK_PERIOD),
     is-unlocked: (>= burn-block-height (+ (var-get creation-block) LOCK_PERIOD)),
-    total-lp-tokens: (var-get total-lp-tokens),
-    remaining-welsh: (default-to u0 (contract-call? 'SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token get-balance CONTRACT))
+    initial-welsh: (var-get initial-welsh-amount),
+    welsh-used: (var-get welsh-used-for-lp),
+    welsh-available: (- (var-get initial-welsh-amount) (var-get welsh-used-for-lp)),
+    total-lp-tokens: (var-get total-lp-tokens)
   }
 )
 
