@@ -57,19 +57,19 @@
 
 ;; --- Community LP Deposits ---
 
-(define-public (deposit-sbtc-for-lp (sbtc-amount uint))
+(define-public (deposit-sbtc-for-lp (lp-amount uint))
     (let (
-          (amounts (calculate-amounts-for-sbtc sbtc-amount))
-          (lp-tokens-needed (get lp-tokens amounts))
+          (amounts (calculate-amounts-for-lp lp-amount))
+          (sbtc-needed (get sbtc-needed amounts))
           (welsh-needed (get welsh-needed amounts))
           (deposit (try! (contract-call? 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token 
-                            transfer sbtc-amount tx-sender CONTRACT none)))
-          (lp-result (try! (as-contract (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool add-liquidity lp-tokens-needed))))
+                            transfer sbtc-needed tx-sender CONTRACT none)))
+          (lp-result (try! (as-contract (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool add-liquidity lp-amount))))
           (lp-tokens-received (get dk lp-result))
           (current-lp (default-to u0 (map-get? user-lp-tokens tx-sender))))
 
     (asserts! (is-some (var-get welsh-depositor)) ERR_NOT_INITIALIZED)
-    (asserts! (> sbtc-amount u0) ERR_INSUFFICIENT_AMOUNT) ;; unnecessary
+    (asserts! (> lp-amount u0) ERR_INSUFFICIENT_AMOUNT)
     (asserts! (< burn-block-height (+ (var-get creation-block) ENTRY_PERIOD)) ERR_TOO_LATE_BRO)
 
       (map-set user-lp-tokens tx-sender (+ current-lp lp-tokens-received))
@@ -79,7 +79,7 @@
       (print {
         type: "community-lp-deposit",
         user: tx-sender,
-        sbtc-in: sbtc-amount,
+        sbtc-in: sbtc-needed,
         welsh-used: welsh-needed,
         lp-tokens: lp-tokens-received,
         unlock-block: (+ (var-get creation-block) LOCK_PERIOD)
@@ -183,23 +183,13 @@
   (default-to u0 (map-get? user-lp-tokens user))
 )
 
-(define-read-only (get-lp-quote-for-sbtc (sbtc-amount uint))
-  (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool quote sbtc-amount (some 0x02))
+(define-read-only (get-quote-for-lp (lp-amount uint))
+  (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool quote lp-amount (some 0x02))
 )
 
-(define-read-only (calculate-amounts-for-sbtc (sbtc-amount uint))
-  (let ((reserves-quote (unwrap-panic (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool quote u0 (some 0x04))))
-        (current-supply (get dk reserves-quote))
-        (sbtc-reserves (get dx reserves-quote))
-        (welsh-reserves (get dy reserves-quote)))
-    (if (> current-supply u0)
-        (let ((lp-tokens-worth (/ (* sbtc-amount current-supply) sbtc-reserves))
-              (welsh-needed (/ (* sbtc-amount welsh-reserves) sbtc-reserves)))
-          {
-            lp-tokens: lp-tokens-worth,
-            welsh-needed: welsh-needed
-          })
-        {
-          lp-tokens: sbtc-amount,
-          welsh-needed: sbtc-amount
-        })))
+(define-read-only (calculate-amounts-for-lp (lp-amount uint))
+  (let ((liquidity-quote (unwrap-panic (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool quote lp-amount (some 0x02)))))
+    {
+      sbtc-needed: (get dx liquidity-quote),
+      welsh-needed: (get dy liquidity-quote)
+    }))
