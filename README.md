@@ -1,36 +1,70 @@
-This contract implements the community LP pool concept you described:
+# Welsh Community Pool
 
-**Key Features:**
+A 12-month locked liquidity pool that allows a Welsh token holder to team up with the Bitcoin & Stacks community to create LP positions.
 
-1. **Philip (Welsh Depositor):**
+## How It Works
 
-   - Calls `initialize-pool` with 100M Welsh tokens
-   - Locks tokens for 12 months (52,560 blocks)
-   - After unlock, gets 50% back via `withdraw-welsh`
+### 1. Welsh Holder Initialization
 
-2. **Community (sBTC Depositors):**
+- Welsh holder calls `initialize-welsh-pool(amount)` with their Welsh tokens
+- Tokens are locked for 12 months (~52,560 Bitcoin blocks)
+- Pool is now ready for community participation
 
-   - Multiple users can call `deposit-sbtc` with any amount
-   - Each deposit tracked individually in `sbtc-deposits` map
-   - After unlock, each gets 50% back via `withdraw-sbtc`
+### 2. Community sBTC Deposits
 
-3. **LP Creation:**
+- Anyone can call `deposit-sbtc-for-lp(amount)` with sBTC
+- Contract automatically:
+  - Gets quote for required Welsh amount
+  - Uses Welsh from pool + user's sBTC to create LP position
+  - Tracks user's LP contribution
+  - LP tokens are held in contract during lock period
 
-   - After unlock period, anyone can call `create-lp-position`
-   - Uses remaining 50% of both Welsh and sBTC to create LP in the existing pool
-   - LP tokens go to this contract (could be modified to distribute)
+### 3. Post-Lock Withdrawals (After 12 Months)
 
-4. **Tracking:**
-   - Maps track all individual deposits
-   - Read-only functions provide pool status
-   - Events logged for all major actions
+**Community Users:**
 
-**Usage Flow:**
+- Call `withdraw-lp-tokens()` to exit their LP position
+- Receives 60% of both sBTC and Welsh from their LP
+- Welsh depositor automatically gets 40% of both tokens
 
-1. Philip: `initialize-pool(100000000000000)` // 100M Welsh
-2. Users: `deposit-sbtc(amount)` // Multiple deposits
-3. Wait 12 months...
-4. `create-lp-position()` // Creates LP with 50% of each token
-5. Users: `withdraw-sbtc()` + Philip: `withdraw-welsh()` // Get 50% back
+**Welsh Depositor:**
 
-Would you like me to modify any part of this design?
+- Call `withdraw-remaining-welsh()` to get unused Welsh back
+- Receives any Welsh not used for LP positions
+- Also receives 40% of all LP proceeds when users withdraw
+
+## Contract Functions
+
+### Public Functions
+
+- `initialize-welsh-pool(welsh-amount)` - Welsh holder locks tokens
+- `deposit-sbtc-for-lp(sbtc-amount)` - Community creates LP with sBTC
+- `withdraw-lp-tokens()` - Users exit after lock period (60/40 split)
+- `withdraw-remaining-welsh()` - Welsh depositor gets unused tokens
+
+### Read-Only Functions
+
+- `get-pool-info()` - Pool status and metrics
+- `get-user-lp-tokens(user)` - User's LP token balance
+- `get-lp-quote-for-sbtc(amount)` - Preview Welsh needed for sBTC amount
+
+## Example Flow
+
+1. **Alice (Welsh holder):** `initialize-welsh-pool(100M Welsh)`
+2. **Bob:** `deposit-sbtc-for-lp(0.1 sBTC)` → Creates LP, gets tracked
+3. **Carol:** `deposit-sbtc-for-lp(0.05 sBTC)` → Creates LP, gets tracked
+4. **Wait 12 months...**
+5. **Bob:** `withdraw-lp-tokens()` → Gets 60% of his LP proceeds, Alice gets 40%
+6. **Carol:** `withdraw-lp-tokens()` → Gets 60% of her LP proceeds, Alice gets 40%
+7. **Alice:** `withdraw-remaining-welsh()` → Gets unused Welsh back
+
+## Benefits
+
+- **Welsh Holders:** Earn yield on large bags without needing sBTC
+- **Bitcoin Community:** Access to Welsh liquidity for LP positions
+- **Automatic Splitting:** 60/40 revenue share built into withdrawals
+- **Time-Locked:** 12-month commitment ensures long-term liquidity
+
+## Contract Address
+
+`SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-community-pool`
