@@ -71,6 +71,7 @@
     (asserts! (is-some (var-get welsh-depositor)) ERR_NOT_INITIALIZED)
     (asserts! (> lp-amount u0) ERR_INSUFFICIENT_AMOUNT)
     (asserts! (< burn-block-height (+ (var-get creation-block) ENTRY_PERIOD)) ERR_TOO_LATE_BRO)
+    (asserts! (not (is-eq (some tx-sender) (var-get welsh-depositor))) ERR_UNAUTHORIZED) ;; else err u2 in withdrawing
 
       (map-set user-lp-tokens tx-sender (+ current-lp lp-tokens-received))
       (var-set total-lp-tokens (+ (var-get total-lp-tokens) lp-tokens-received))
@@ -107,13 +108,14 @@
           (depositor-sbtc-share (- sbtc-received user-sbtc-share))
           (user-welsh-share (/ (* welsh-received u60) u100))
           (depositor-welsh-share (- welsh-received user-welsh-share))
+          (user tx-sender)
           )
         
         ;; Transfer to user (60%)
         (try! (as-contract (contract-call? 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token 
-               transfer user-sbtc-share CONTRACT tx-sender none)))
+               transfer user-sbtc-share CONTRACT user none)))
         (try! (as-contract (contract-call? 'SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token 
-               transfer user-welsh-share CONTRACT tx-sender none)))
+               transfer user-welsh-share CONTRACT user none)))
         
         ;; Transfer to welsh depositor (40%)
         (try! (as-contract (contract-call? 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token 
@@ -141,17 +143,19 @@
   )
 
 (define-public (withdraw-remaining-welsh)
-  (let ((unlock-block (+ (var-get creation-block) LOCK_PERIOD)))
+  (let ((unlock-block (+ (var-get creation-block) LOCK_PERIOD))
+        (welsh-depositor-principal (unwrap-panic (var-get welsh-depositor)))
+      )
     
     (asserts! (>= burn-block-height unlock-block) ERR_STILL_LOCKED)
-    (asserts! (is-eq (some tx-sender) (var-get welsh-depositor)) ERR_UNAUTHORIZED)
+    (asserts! (is-eq tx-sender welsh-depositor-principal) ERR_UNAUTHORIZED)
     
     ;; Calculate remaining Welsh (initial - used for LP)
     (let ((remaining-welsh (- (var-get initial-welsh-amount) (var-get welsh-used-for-lp))))
       
       (and (> remaining-welsh u0)
            (try! (as-contract (contract-call? 'SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token 
-                  transfer remaining-welsh CONTRACT tx-sender none))))
+                  transfer remaining-welsh CONTRACT welsh-depositor-principal none))))
       
       (print {
         type: "welsh-withdrawal",
