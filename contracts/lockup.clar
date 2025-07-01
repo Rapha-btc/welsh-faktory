@@ -12,9 +12,12 @@
 (define-constant ERR_STILL_LOCKED (err u407))
 (define-constant ERR_NO_DEPOSIT (err u408))
 (define-constant ERR_INSUFFICIENT_WELSH (err u409))
+(define-constant ERR_TOO_LATE_BRO (err u410))
 
 ;; Lock period (12 months = ~52,560 blocks)
 (define-constant LOCK_PERIOD u52560)
+(define-constant ENTRY_PERIOD u39420)
+
 
 ;; Data vars
 (define-data-var welsh-depositor (optional principal) none)
@@ -59,7 +62,8 @@
   (begin
     (asserts! (is-some (var-get welsh-depositor)) ERR_NOT_INITIALIZED)
     (asserts! (> sbtc-amount u0) ERR_INSUFFICIENT_AMOUNT)
-    
+    (asserts! (>= burn-block-height ((+ (var-get creation-block) ENTRY_PERIOD))) ERR_TOO_LATE_BRO)
+
     ;; Get quote to determine Welsh needed
     (let ((lp-quote (unwrap-panic (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool quote sbtc-amount (some 0x02))))
           (welsh-needed (get dy lp-quote))
@@ -171,6 +175,7 @@
     welsh-depositor: (var-get welsh-depositor),
     creation-block: (var-get creation-block),
     unlock-block: (+ (var-get creation-block) LOCK_PERIOD),
+    entry-ends: (+ (var-get creation-block) ENTRY_PERIOD),
     is-unlocked: (>= burn-block-height (+ (var-get creation-block) LOCK_PERIOD)),
     initial-welsh: (var-get initial-welsh-amount),
     welsh-used: (var-get welsh-used-for-lp),
