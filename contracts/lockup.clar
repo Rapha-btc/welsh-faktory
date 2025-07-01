@@ -58,23 +58,17 @@
 ;; --- Community LP Deposits ---
 
 (define-public (deposit-sbtc-for-lp (sbtc-amount uint))
-  (begin
-    (asserts! (is-some (var-get welsh-depositor)) ERR_NOT_INITIALIZED)
-    (asserts! (> sbtc-amount u0) ERR_INSUFFICIENT_AMOUNT)
-    (asserts! (< burn-block-height ((+ (var-get creation-block) ENTRY_PERIOD))) ERR_TOO_LATE_BRO)
-
-    ;; Get quote to determine Welsh needed
     (let ((lp-quote (unwrap-panic (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool quote sbtc-amount (some 0x02))))
           (welsh-needed (get dy lp-quote))
           ;; (available-welsh (- (var-get initial-welsh-amount) (var-get welsh-used-for-lp)))
           (lp-result (try! (as-contract (contract-call? 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool add-liquidity sbtc-amount))))
           (lp-tokens-received (get dk lp-result))
           (current-lp (default-to u0 (map-get? user-lp-tokens tx-sender))))
-      
-      ;; Check if enough Welsh available -> already taken care in the underlying pool contract
-      ;; (asserts! (>= available-welsh welsh-needed) ERR_INSUFFICIENT_WELSH)
-      
-      ;; Update tracking
+
+    (asserts! (is-some (var-get welsh-depositor)) ERR_NOT_INITIALIZED)
+    (asserts! (> sbtc-amount u0) ERR_INSUFFICIENT_AMOUNT)
+    (asserts! (< burn-block-height (+ (var-get creation-block) ENTRY_PERIOD)) ERR_TOO_LATE_BRO)
+
       (map-set user-lp-tokens tx-sender (+ current-lp lp-tokens-received))
       (var-set total-lp-tokens (+ (var-get total-lp-tokens) lp-tokens-received))
       (var-set welsh-used-for-lp (+ (var-get welsh-used-for-lp) welsh-needed))
@@ -91,7 +85,6 @@
       (ok lp-tokens-received)
     )
   )
-)
 
 ;; --- Withdrawals (after lock period) ---
 
