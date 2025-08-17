@@ -116,16 +116,9 @@
                                 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
                                 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                                 u100000000  ;; factor
-                                user-percentage))))  ;; Use user's percentage instead of 100%
-          ;; Get actual amounts from the position burn calculation
-          (position-data (try! (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01
-                               get-position-given-burn
-                               'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
-                               'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
-                               u100000000
-                               user-lp)))
-          (stx-received (get dx position-data))
-          (bfaktory-received (get dy position-data))
+                                user-percentage))))  ;; Percentage to reduce (user's share)
+          (stx-received (get dx remove-result))
+          (bfaktory-received (get dy remove-result))
           ;; Calculate 40-60 split (user gets 60%, bfaktory depositor gets 40%)
           (user-stx-share (/ (* stx-received u60) u100))
           (depositor-stx-share (- stx-received user-stx-share))

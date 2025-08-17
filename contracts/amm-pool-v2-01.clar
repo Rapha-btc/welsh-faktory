@@ -15,7 +15,6 @@
 (define-constant ERR-NO-LIQUIDITY (err u2010))
 (define-constant ERR-MAX-IN-RATIO (err u2011))
 (define-constant ERR-MAX-OUT-RATIO (err u2012))
-(define-data-var paused bool true)
 (define-read-only (is-dao-or-extension)
     (ok (asserts! (or (is-eq tx-sender .executor-dao) (contract-call? .executor-dao is-extension contract-caller)) ERR-NOT-AUTHORIZED)))
 (define-read-only (is-blocklisted-or-default (sender principal))
