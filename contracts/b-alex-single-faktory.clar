@@ -164,9 +164,9 @@
         (user-lp (default-to u0 (map-get? user-lp-tokens user)))
         (bfaktory-depositor-principal (unwrap-panic (var-get bfaktory-depositor))))
     
+    (asserts! (is-eq tx-sender bfaktory-depositor-principal) ERR_UNAUTHORIZED)
     (asserts! (>= burn-block-height unlock-block) ERR_STILL_LOCKED)
     (asserts! (> user-lp u0) ERR_NO_DEPOSIT)
-    ()
     
     ;; Remove liquidity from Alex pool (sends both tokens to this contract)
     (let ((user-percentage (div-down user-lp (var-get total-lp-tokens)))
@@ -198,13 +198,13 @@
         (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                transfer depositor-bfaktory-share CONTRACT bfaktory-depositor-principal none)))
         
-        ;; Remove from tracking
-        (map-delete user-lp-tokens tx-sender)
+        (map-delete user-lp-tokens user)
         (var-set total-lp-tokens (- (var-get total-lp-tokens) user-lp))
         
         (print {
-          type: "lp-withdrawal",
+          type: "depositor-assisted-withdrawal",
           user: user,
+          withdrawn-by: tx-sender,
           lp-tokens: user-lp,
           user-stx: user-stx-share,
           user-bfaktory: user-bfaktory-share,
