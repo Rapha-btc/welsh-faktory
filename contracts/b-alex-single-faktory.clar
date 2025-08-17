@@ -15,8 +15,8 @@
 (define-constant ERR_TOO_LATE_BRO (err u409))
 
 ;; Lock period (12 months = ~52,560 blocks)
-(define-constant LOCK_PERIOD u52560)
-(define-constant ENTRY_PERIOD u39420)
+(define-constant LOCK_PERIOD u0) ;; testing then back to u52560) or 6 months
+(define-constant ENTRY_PERIOD u39420) ;; maybe make the entry period just like 3 weeks or 21 days in bitcoin blocks
 
 ;; Data vars
 (define-data-var bfaktory-depositor (optional principal) none)

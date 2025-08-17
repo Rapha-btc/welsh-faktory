@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { uintCV, principalCV, ClarityVersion } from "@stacks/transactions";
 import { SimulationBuilder } from "stxer";
 
-// Define addresses
+// Define addresses (using your exact addresses)
 const DEPLOYER = "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM";
 const BFAKTORY_PROVIDER = "SP3VES970E3ZGHQEZ69R8PY62VP3R0C8CTQ8DAMQW";
 const STX_USER_1 = "SPHNEPXY2N25RTB6BMJGJXAH0XSHV55GZB2FC69D";
@@ -26,13 +26,13 @@ SimulationBuilder.new()
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
     function_name: "initialize-bfaktory-pool",
-    function_args: [uintCV(1000000000000000)], // 10M time 10^8 for micro bfaktory tokens
+    function_args: [uintCV(1000000000000000)], // Your exact amount
   })
 
   // Check pool info after initialization
   .addEvalCode(`${DEPLOYER}.b-alex-single-faktory`, "(get-pool-info)")
 
-  // STX user 1 deposits for LP
+  // STX user 1 deposits for LP (your exact amount)
   .withSender(STX_USER_1)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -40,12 +40,36 @@ SimulationBuilder.new()
     function_args: [uintCV(100000000)], // 100 STX
   })
 
-  // STX user 2 deposits for LP
+  // STX user 2 deposits for LP (your exact amount)
   .withSender(STX_USER_2)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
     function_name: "deposit-stx-for-lp",
     function_args: [uintCV(200000000)], // 200 STX
+  })
+
+  // Test: Try to withdraw before lock period expires (should fail)
+  .withSender(STX_USER_1)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens",
+    function_args: [],
+  })
+
+  // Test: Try bfaktory provider depositing STX (should fail - unauthorized)
+  .withSender(BFAKTORY_PROVIDER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "deposit-stx-for-lp",
+    function_args: [uintCV(25000000)], // Should fail with ERR_UNAUTHORIZED
+  })
+
+  // Test: Try double initialization (should fail)
+  .withSender(BFAKTORY_PROVIDER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "initialize-bfaktory-pool",
+    function_args: [uintCV(500000000000000)], // Should fail with ERR_ALREADY_INITIALIZED
   })
 
   // Check user LP tokens
@@ -64,5 +88,4 @@ SimulationBuilder.new()
 
   .run()
   .catch(console.error);
-
 // runs https://stxer.xyz/simulations/mainnet/56ba58e3a14b7fe0d56537da8dc6a406
