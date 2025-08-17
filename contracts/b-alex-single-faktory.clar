@@ -1,3 +1,4 @@
+;; /Users/owner/welsh/welshies/contracts/stx-bfaktory-sso.clar
 ;; STX-bfaktory Single-Sided Opportunity Contract
 ;; Community STX + Provider bfaktory = Shared LP rewards
 
@@ -35,7 +36,7 @@
     (asserts! (> bfaktory-amount u0) ERR_INSUFFICIENT_AMOUNT)
     
     ;; Transfer bfaktory tokens to this contract
-    (try! (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+    (try! (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
            transfer bfaktory-amount tx-sender CONTRACT none))
     
     ;; Set state
@@ -66,8 +67,8 @@
           ;; Add liquidity to Alex pool using factor u100000000 (based on screenshot)
           (lp-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
                             add-to-position 
-                            'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx
-                            'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+                            'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
+                            'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                             u100000000  ;; factor from screenshot
                             (* stx-needed u100)  ;; convert STX to wSTX fixed format -> times 100
                             (some bfaktory-needed)))))  ;; convert to fixed format -> times 1
@@ -109,15 +110,15 @@
     ;; Remove liquidity from Alex pool (sends both tokens to this contract)
     (let ((remove-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
                                 reduce-position
-                                'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx
-                                'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+                                'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
+                                'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                                 u100000000  ;; factor
                                 u100000000))))  ;; 100% of position
           ;; Get actual amounts from the position burn calculation
           (position-data (try! (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01
                                get-position-given-burn
-                               'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx
-                               'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+                               'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
+                               'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                                u100000000
                                user-lp)))
           (stx-received (get dx position-data))
@@ -133,14 +134,14 @@
         (try! (as-contract (stx-transfer? (/ user-stx-share u100) CONTRACT user)))
         
         ;; Transfer bfaktory to user (60%)
-        (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+        (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                transfer user-bfaktory-share CONTRACT user none)))
         
         ;; Transfer STX to bfaktory depositor (40%)
         (try! (as-contract (stx-transfer? (/ depositor-stx-share u100) CONTRACT bfaktory-depositor-principal)))
         
         ;; Transfer bfaktory to depositor (40%)
-        (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+        (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                transfer depositor-bfaktory-share CONTRACT bfaktory-depositor-principal none)))
         
         ;; Remove from tracking
@@ -173,7 +174,7 @@
     (let ((remaining-bfaktory (- (var-get initial-bfaktory-amount) (var-get bfaktory-used-for-lp))))
       
       (and (> remaining-bfaktory u0)
-           (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+           (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                   transfer remaining-bfaktory CONTRACT bfaktory-depositor-principal none))))
       
       (print {
@@ -209,8 +210,8 @@
 (define-read-only (get-quote-for-lp (stx-amount uint))
   (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
     get-token-given-position
-    'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx
-    'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wbfaktory
+    'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
+    'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
     u100000000  ;; factor
     (* stx-amount u100)  ;; convert STX to wSTX fixed
     none))

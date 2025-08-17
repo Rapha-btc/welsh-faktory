@@ -1,56 +1,24 @@
 [project]
-name = 'welshies'
-description = ''
+name = 'stx-bfaktory-sso-test'
+description = 'Testing STX-bfaktory Single-Sided Opportunity Contract'
 authors = []
 telemetry = false
 cache_dir = './.cache'
 
 [[project.requirements]]
-contract_id = 'SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.dexterity-traits-v0'
+contract_id = 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01'
 
 [[project.requirements]]
-contract_id = 'SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS.charisma-traits-v1'
+contract_id = 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory'
 
 [[project.requirements]]
-contract_id = 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.welshcorgicoin-faktory-pool'
-
-[[project.requirements]]
-contract_id = 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token'
-
-[[project.requirements]]
-contract_id = 'SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token'
-
-[[project.requirements]]
-contract_id = 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-deposit'
-[contracts.amm-pool-v2-01]
-path = 'contracts/amm-pool-v2-01.clar'
-clarity_version = 3
-epoch = 3.1
-
-[contracts.lockup]
-path = 'contracts/lockup.clar'
-clarity_version = 3
-epoch = 3.1
-
-[contracts.lockup2]
-path = 'contracts/lockup2.clar'
-clarity_version = 3
-epoch = 3.1
+contract_id = 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2'
 
 [contracts.stx-bfaktory-sso]
 path = 'contracts/stx-bfaktory-sso.clar'
 clarity_version = 3
-epoch = 3.1
+epoch = 3.0
 
-[contracts.token-wbfaktory]
-path = 'contracts/token-wbfaktory.clar'
-clarity_version = 3
-epoch = 3.1
-
-[contracts.token-wstx-v2]
-path = 'contracts/token-wstx-v2.clar'
-clarity_version = 3
-epoch = 3.1
 [repl.analysis]
 passes = ['check_checker']
 
