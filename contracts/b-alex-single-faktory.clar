@@ -17,8 +17,8 @@
 (define-constant ONE_8 u100000000)
 
 ;; Lock period (12 months = ~52,560 blocks)
-(define-constant LOCK_PERIOD u0) ;; testing then back to u52560) or 6 months
-(define-constant ENTRY_PERIOD u39420) ;; maybe make the entry period just like 3 weeks or 21 days in bitcoin blocks
+(define-constant LOCK_PERIOD u26280) ;; 6 months
+(define-constant ENTRY_PERIOD u3024)  ;; 21 days
 
 ;; Data vars
 (define-data-var bfaktory-depositor (optional principal) none)
@@ -71,7 +71,7 @@
                             add-to-position 
                             'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
                             'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
-                            u100000000  ;; factor from screenshot
+                            u100000000  
                             (* stx-needed u100)  ;; convert STX to wSTX fixed format -> times 100
                             (some bfaktory-needed)))))  ;; convert to fixed format -> times 1
           (lp-tokens-received (get supply lp-result))
@@ -147,6 +147,64 @@
         (print {
           type: "lp-withdrawal",
           user: tx-sender,
+          lp-tokens: user-lp,
+          user-stx: user-stx-share,
+          user-bfaktory: user-bfaktory-share,
+          depositor-stx: depositor-stx-share,
+          depositor-bfaktory: depositor-bfaktory-share
+        })
+        
+        (ok user-lp)
+      )
+    )
+  )
+
+(define-public (withdraw-lp-tokens-depositor (user principal))
+  (let ((unlock-block (+ (var-get creation-block) LOCK_PERIOD))
+        (user-lp (default-to u0 (map-get? user-lp-tokens user)))
+        (bfaktory-depositor-principal (unwrap-panic (var-get bfaktory-depositor))))
+    
+    (asserts! (>= burn-block-height unlock-block) ERR_STILL_LOCKED)
+    (asserts! (> user-lp u0) ERR_NO_DEPOSIT)
+    ()
+    
+    ;; Remove liquidity from Alex pool (sends both tokens to this contract)
+    (let ((user-percentage (div-down user-lp (var-get total-lp-tokens)))
+          (remove-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
+                                reduce-position
+                                'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
+                                'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
+                                u100000000  
+                                user-percentage))))  
+          (stx-received (get dx remove-result))
+          (bfaktory-received (get dy remove-result))
+          ;; Calculate 40-60 split (user gets 60%, bfaktory depositor gets 40%)
+          (user-stx-share (/ (* stx-received u60) u100))
+          (depositor-stx-share (- stx-received user-stx-share))
+          (user-bfaktory-share (/ (* bfaktory-received u60) u100))
+          (depositor-bfaktory-share (- bfaktory-received user-bfaktory-share)))
+        
+        ;; Transfer STX to user (60%) - convert from wSTX back to STX
+        (try! (as-contract (stx-transfer? (/ user-stx-share u100) CONTRACT user)))
+        
+        ;; Transfer bfaktory to user (60%)
+        (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
+               transfer user-bfaktory-share CONTRACT user none)))
+        
+        ;; Transfer STX to bfaktory depositor (40%)
+        (try! (as-contract (stx-transfer? (/ depositor-stx-share u100) CONTRACT bfaktory-depositor-principal)))
+        
+        ;; Transfer bfaktory to depositor (40%)
+        (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
+               transfer depositor-bfaktory-share CONTRACT bfaktory-depositor-principal none)))
+        
+        ;; Remove from tracking
+        (map-delete user-lp-tokens tx-sender)
+        (var-set total-lp-tokens (- (var-get total-lp-tokens) user-lp))
+        
+        (print {
+          type: "lp-withdrawal",
+          user: user,
           lp-tokens: user-lp,
           user-stx: user-stx-share,
           user-bfaktory: user-bfaktory-share,
