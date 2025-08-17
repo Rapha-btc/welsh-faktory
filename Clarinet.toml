@@ -22,11 +22,35 @@ contract_id = 'SP3NE50GEXFG9SZGTT51P40X2CKYSZ5CC4ZTZ7A2G.welshcorgicoin-token'
 
 [[project.requirements]]
 contract_id = 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-deposit'
+[contracts.amm-pool-v2-01]
+path = 'contracts/amm-pool-v2-01.clar'
+clarity_version = 3
+epoch = 3.1
+
 [contracts.lockup]
 path = 'contracts/lockup.clar'
 clarity_version = 3
 epoch = 3.1
 
+[contracts.lockup2]
+path = 'contracts/lockup2.clar'
+clarity_version = 3
+epoch = 3.1
+
+[contracts.stx-bfaktory-sso]
+path = 'contracts/stx-bfaktory-sso.clar'
+clarity_version = 3
+epoch = 3.1
+
+[contracts.token-wbfaktory]
+path = 'contracts/token-wbfaktory.clar'
+clarity_version = 3
+epoch = 3.1
+
+[contracts.token-wstx-v2]
+path = 'contracts/token-wstx-v2.clar'
+clarity_version = 3
+epoch = 3.1
 [repl.analysis]
 passes = ['check_checker']
 
