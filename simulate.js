@@ -7,6 +7,7 @@ const DEPLOYER = "SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM";
 const BFAKTORY_PROVIDER = "SP3VES970E3ZGHQEZ69R8PY62VP3R0C8CTQ8DAMQW";
 const STX_USER_1 = "SPHNEPXY2N25RTB6BMJGJXAH0XSHV55GZB2FC69D";
 const STX_USER_2 = "SP3GS0VZBE15D528128G7FN3HXJQ20BXCG4CNPG64";
+const STX_USER_3 = "SP3EMA3PNFKKF7C9DTPR6N5K21B8QFDGJP9B5FCGF"; // Additional user for depositor withdrawal test
 const RANDOM_USER = "SP1K1A1PMGW2ZJCNF46NWZWHG8TS1D23EGH1KNK60"; // Someone not in the contract
 
 SimulationBuilder.new()
@@ -49,18 +50,29 @@ SimulationBuilder.new()
     function_args: [uintCV(200000000)], // 200 STX
   })
 
-  // Check user LP tokens before withdrawal
+  // STX user 3 deposits for LP - this user will be withdrawn by depositor
+  .withSender(STX_USER_3)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "deposit-stx-for-lp",
+    function_args: [uintCV(150000000)], // 150 STX
+  })
+
+  // Check user LP tokens before any withdrawals
   .addEvalCode(
     `${DEPLOYER}.b-alex-single-faktory`,
     `(get-user-lp-tokens '${STX_USER_1})`
   )
-
   .addEvalCode(
     `${DEPLOYER}.b-alex-single-faktory`,
     `(get-user-lp-tokens '${STX_USER_2})`
   )
+  .addEvalCode(
+    `${DEPLOYER}.b-alex-single-faktory`,
+    `(get-user-lp-tokens '${STX_USER_3})`
+  )
 
-  // TEST BUG 1: Random user tries to withdraw (should fail with ERR_NO_DEPOSIT)
+  // TEST: Random user tries to withdraw (should fail with ERR_NO_DEPOSIT)
   .withSender(RANDOM_USER)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -68,7 +80,7 @@ SimulationBuilder.new()
     function_args: [],
   })
 
-  // TEST BUG 2: User 1 withdraws (this will show the percentage issue)
+  // TEST: User 1 withdraws normally
   .withSender(STX_USER_1)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -82,15 +94,45 @@ SimulationBuilder.new()
     `(get-user-lp-tokens '${STX_USER_1})`
   )
 
+  // TEST: Random user tries to use depositor withdrawal function (should fail - not authorized)
+  .withSender(RANDOM_USER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens-depositor",
+    function_args: [principalCV(STX_USER_2)],
+  })
+
+  // TEST: Depositor withdraws on behalf of User 3 (should succeed)
+  .withSender(BFAKTORY_PROVIDER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens-depositor",
+    function_args: [principalCV(STX_USER_3)],
+  })
+
+  // Check User 3's LP tokens after depositor withdrawal (should be 0)
   .addEvalCode(
     `${DEPLOYER}.b-alex-single-faktory`,
-    `(get-user-lp-tokens '${STX_USER_2})`
+    `(get-user-lp-tokens '${STX_USER_3})`
   )
 
-  // Check pool info after User 1 withdrawal
-  .addEvalCode(`${DEPLOYER}.b-alex-single-faktory`, "(get-pool-info)")
+  // TEST: User 3 tries to withdraw after depositor already withdrew for them (should fail with ERR_NO_DEPOSIT)
+  .withSender(STX_USER_3)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens",
+    function_args: [],
+  })
 
-  // TEST BUG 2 CONTINUED: User 2 tries to withdraw
+  // TEST: Depositor tries to withdraw for User 3 again (should fail with ERR_NO_DEPOSIT)
+  .withSender(BFAKTORY_PROVIDER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens-depositor",
+    function_args: [principalCV(STX_USER_3)],
+  })
+
+  // TEST: User 2 withdraws normally (should still work)
   .withSender(STX_USER_2)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -98,7 +140,10 @@ SimulationBuilder.new()
     function_args: [],
   })
 
-  // Random user tries to withdraw remaining bfaktory (should fail - not authorized)
+  // Check pool info after all withdrawals
+  .addEvalCode(`${DEPLOYER}.b-alex-single-faktory`, "(get-pool-info)")
+
+  // TEST: Random user tries to withdraw remaining bfaktory (should fail - not authorized)
   .withSender(RANDOM_USER)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -106,7 +151,7 @@ SimulationBuilder.new()
     function_args: [],
   })
 
-  // Bfaktory provider withdraws remaining bfaktory tokens (should work)
+  // TEST: Bfaktory provider withdraws remaining bfaktory tokens (should work)
   .withSender(BFAKTORY_PROVIDER)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -114,9 +159,9 @@ SimulationBuilder.new()
     function_args: [],
   })
 
-  // Test error cases that should still fail:
+  // Test additional error cases:
 
-  // Try bfaktory provider depositing STX (should fail - unauthorized)
+  // TEST: Try bfaktory provider depositing STX (should fail - unauthorized)
   .withSender(BFAKTORY_PROVIDER)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -124,7 +169,7 @@ SimulationBuilder.new()
     function_args: [uintCV(25000000)], // Should fail with ERR_UNAUTHORIZED
   })
 
-  // Try double initialization (should fail)
+  // TEST: Try double initialization (should fail)
   .withSender(BFAKTORY_PROVIDER)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -142,3 +187,7 @@ SimulationBuilder.new()
 // https://stxer.xyz/simulations/mainnet/4c6ef8802df5d885633ea9078213b41a
 
 // all green now: https://stxer.xyz/simulations/mainnet/59962cd7656f4f74d1c7b071055b5280
+// all green: https://stxer.xyz/simulations/mainnet/9bc9ad1bbbb25efd0de53c70b976b994
+// https://stxer.xyz/simulations/mainnet/1b68d6c469ae2df750e60d72a0364a7a
+// https://stxer.xyz/simulations/mainnet/1b68d6c469ae2df750e60d72a0364a7a
+// https://stxer.xyz/simulations/mainnet/4137afe1d1f6c955ea201b6fe5802389

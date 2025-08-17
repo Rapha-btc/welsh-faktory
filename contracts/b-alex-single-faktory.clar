@@ -1,11 +1,5 @@
-;; /Users/owner/welsh/welshies/contracts/stx-bfaktory-sso.clar
-;; STX-bfaktory Single-Sided Opportunity Contract
-;; Community STX + Provider bfaktory = Shared LP rewards
-
-;; Constants
 (define-constant CONTRACT (as-contract tx-sender))
 
-;; Errors
 (define-constant ERR_UNAUTHORIZED (err u403))
 (define-constant ERR_NOT_INITIALIZED (err u404))
 (define-constant ERR_ALREADY_INITIALIZED (err u405))
@@ -16,32 +10,25 @@
 
 (define-constant ONE_8 u100000000)
 
-;; Lock period (12 months = ~52,560 blocks)
-(define-constant LOCK_PERIOD u26280) ;; 6 months
-(define-constant ENTRY_PERIOD u3024)  ;; 21 days
+(define-constant LOCK_PERIOD u12960) 
+(define-constant ENTRY_PERIOD u3024)  
 
-;; Data vars
 (define-data-var bfaktory-depositor (optional principal) none)
 (define-data-var creation-block uint u0)
 (define-data-var initial-bfaktory-amount uint u0)
 (define-data-var bfaktory-used-for-lp uint u0)
 (define-data-var total-lp-tokens uint u0)
 
-;; Track individual LP contributions
 (define-map user-lp-tokens principal uint)
-
-;; --- Initialization ---
 
 (define-public (initialize-bfaktory-pool (bfaktory-amount uint))
   (begin
     (asserts! (is-none (var-get bfaktory-depositor)) ERR_ALREADY_INITIALIZED)
     (asserts! (> bfaktory-amount u0) ERR_INSUFFICIENT_AMOUNT)
     
-    ;; Transfer bfaktory tokens to this contract
     (try! (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
            transfer bfaktory-amount tx-sender CONTRACT none))
     
-    ;; Set state
     (var-set bfaktory-depositor (some tx-sender))
     (var-set creation-block burn-block-height)
     (var-set initial-bfaktory-amount bfaktory-amount)
@@ -57,23 +44,19 @@
   )
 )
 
-;; --- Community STX Deposits ---
-
 (define-public (deposit-stx-for-lp (stx-amount uint))
     (let (
           (amounts (calculate-amounts-for-lp stx-amount))
           (stx-needed (get stx-needed amounts))
           (bfaktory-needed (get bfaktory-needed amounts))
-          ;; Transfer STX to contract (wrapped as wSTX)
           (stx-deposit (try! (stx-transfer? stx-needed tx-sender CONTRACT)))
-          ;; Add liquidity to Alex pool using factor u100000000 (based on screenshot)
           (lp-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
                             add-to-position 
                             'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
                             'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                             u100000000  
-                            (* stx-needed u100)  ;; convert STX to wSTX fixed format -> times 100
-                            (some bfaktory-needed)))))  ;; convert to fixed format -> times 1
+                            (* stx-needed u100)  
+                            (some bfaktory-needed)))))  
           (lp-tokens-received (get supply lp-result))
           (current-lp (default-to u0 (map-get? user-lp-tokens tx-sender))))
 
@@ -99,8 +82,6 @@
     )
   )
 
-;; --- Withdrawals (after lock period) ---
-
 (define-public (withdraw-lp-tokens)
   (let ((unlock-block (+ (var-get creation-block) LOCK_PERIOD))
         (user-lp (default-to u0 (map-get? user-lp-tokens tx-sender)))
@@ -109,38 +90,31 @@
     (asserts! (>= burn-block-height unlock-block) ERR_STILL_LOCKED)
     (asserts! (> user-lp u0) ERR_NO_DEPOSIT)
     
-    ;; Remove liquidity from Alex pool (sends both tokens to this contract)
     (let ((user-percentage (div-down user-lp (var-get total-lp-tokens)))
           (remove-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
                                 reduce-position
                                 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
                                 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
-                                u100000000  ;; factor
-                                user-percentage))))  ;; Percentage to reduce (user's share)
+                                u100000000  
+                                user-percentage))))  
           (stx-received (get dx remove-result))
           (bfaktory-received (get dy remove-result))
-          ;; Calculate 40-60 split (user gets 60%, bfaktory depositor gets 40%)
           (user-stx-share (/ (* stx-received u60) u100))
           (depositor-stx-share (- stx-received user-stx-share))
           (user-bfaktory-share (/ (* bfaktory-received u60) u100))
           (depositor-bfaktory-share (- bfaktory-received user-bfaktory-share))
           (user tx-sender))
         
-        ;; Transfer STX to user (60%) - convert from wSTX back to STX
         (try! (as-contract (stx-transfer? (/ user-stx-share u100) CONTRACT user)))
         
-        ;; Transfer bfaktory to user (60%)
         (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                transfer user-bfaktory-share CONTRACT user none)))
         
-        ;; Transfer STX to bfaktory depositor (40%)
         (try! (as-contract (stx-transfer? (/ depositor-stx-share u100) CONTRACT bfaktory-depositor-principal)))
         
-        ;; Transfer bfaktory to depositor (40%)
         (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                transfer depositor-bfaktory-share CONTRACT bfaktory-depositor-principal none)))
         
-        ;; Remove from tracking
         (map-delete user-lp-tokens tx-sender)
         (var-set total-lp-tokens (- (var-get total-lp-tokens) user-lp))
         
@@ -168,7 +142,6 @@
     (asserts! (>= burn-block-height unlock-block) ERR_STILL_LOCKED)
     (asserts! (> user-lp u0) ERR_NO_DEPOSIT)
     
-    ;; Remove liquidity from Alex pool (sends both tokens to this contract)
     (let ((user-percentage (div-down user-lp (var-get total-lp-tokens)))
           (remove-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
                                 reduce-position
@@ -178,23 +151,18 @@
                                 user-percentage))))  
           (stx-received (get dx remove-result))
           (bfaktory-received (get dy remove-result))
-          ;; Calculate 40-60 split (user gets 60%, bfaktory depositor gets 40%)
           (user-stx-share (/ (* stx-received u60) u100))
           (depositor-stx-share (- stx-received user-stx-share))
           (user-bfaktory-share (/ (* bfaktory-received u60) u100))
           (depositor-bfaktory-share (- bfaktory-received user-bfaktory-share)))
         
-        ;; Transfer STX to user (60%) - convert from wSTX back to STX
         (try! (as-contract (stx-transfer? (/ user-stx-share u100) CONTRACT user)))
         
-        ;; Transfer bfaktory to user (60%)
         (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                transfer user-bfaktory-share CONTRACT user none)))
         
-        ;; Transfer STX to bfaktory depositor (40%)
         (try! (as-contract (stx-transfer? (/ depositor-stx-share u100) CONTRACT bfaktory-depositor-principal)))
         
-        ;; Transfer bfaktory to depositor (40%)
         (try! (as-contract (contract-call? 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                transfer depositor-bfaktory-share CONTRACT bfaktory-depositor-principal none)))
         
@@ -218,13 +186,12 @@
   )
 
 (define-public (withdraw-remaining-bfaktory)
-  (let ((unlock-block (+ (var-get creation-block) LOCK_PERIOD))
+  (let ((entry-end-block (+ (var-get creation-block) ENTRY_PERIOD))
         (bfaktory-depositor-principal (unwrap-panic (var-get bfaktory-depositor))))
     
-    (asserts! (>= burn-block-height unlock-block) ERR_STILL_LOCKED)
+    (asserts! (>= burn-block-height entry-end-block) ERR_STILL_LOCKED)
     (asserts! (is-eq tx-sender bfaktory-depositor-principal) ERR_UNAUTHORIZED)
     
-    ;; Calculate remaining bfaktory (initial - used for LP)
     (let ((remaining-bfaktory (- (var-get initial-bfaktory-amount) (var-get bfaktory-used-for-lp))))
       
       (and (> remaining-bfaktory u0)
@@ -240,8 +207,6 @@
     )
   )
 )
-
-;; --- Read-Only Functions ---
 
 (define-read-only (get-pool-info)
   {
@@ -266,8 +231,8 @@
     get-token-given-position
     'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
     'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
-    u100000000  ;; factor
-    (* stx-amount u100)  ;; convert STX to wSTX fixed
+    u100000000  
+    (* stx-amount u100) 
     none))
 
 (define-read-only (calculate-amounts-for-lp (stx-amount uint))
@@ -279,6 +244,3 @@
 
 (define-private (div-down (a uint) (b uint))
   (if (is-eq a u0) u0 (/ (* a ONE_8) b)))
-
-;; ignoring the dust LP tokens
-
