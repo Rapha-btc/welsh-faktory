@@ -14,6 +14,8 @@
 (define-constant ERR_NO_DEPOSIT (err u408))
 (define-constant ERR_TOO_LATE_BRO (err u409))
 
+(define-constant ONE_8 u100000000)
+
 ;; Lock period (12 months = ~52,560 blocks)
 (define-constant LOCK_PERIOD u0) ;; testing then back to u52560) or 6 months
 (define-constant ENTRY_PERIOD u39420) ;; maybe make the entry period just like 3 weeks or 21 days in bitcoin blocks
@@ -108,12 +110,13 @@
     (asserts! (> user-lp u0) ERR_NO_DEPOSIT)
     
     ;; Remove liquidity from Alex pool (sends both tokens to this contract)
-    (let ((remove-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
+    (let ((user-percentage (div-down (* user-lp ONE_8) (var-get total-lp-tokens)))
+          (remove-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
                                 reduce-position
                                 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2
                                 'SP1KK89R86W73SJE6RQNQPRDM471008S9JY4FQA62.token-wbfaktory
                                 u100000000  ;; factor
-                                u100000000))))  ;; 100% of position
+                                user-percentage))))  ;; Use user's percentage instead of 100%
           ;; Get actual amounts from the position burn calculation
           (position-data (try! (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01
                                get-position-given-burn
@@ -222,3 +225,9 @@
       stx-needed: stx-amount,
       bfaktory-needed: (get dy liquidity-quote)
     }))
+
+(define-private (div-down (a uint) (b uint))
+  (if (is-eq a u0) u0 (/ (* a ONE_8) b)))
+
+;; ignoring the dust LP tokens
+
