@@ -48,31 +48,7 @@ SimulationBuilder.new()
     function_args: [uintCV(200000000)], // 200 STX
   })
 
-  // Test: Try to withdraw before lock period expires (should fail)
-  .withSender(STX_USER_1)
-  .addContractCall({
-    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
-    function_name: "withdraw-lp-tokens",
-    function_args: [],
-  })
-
-  // Test: Try bfaktory provider depositing STX (should fail - unauthorized)
-  .withSender(BFAKTORY_PROVIDER)
-  .addContractCall({
-    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
-    function_name: "deposit-stx-for-lp",
-    function_args: [uintCV(25000000)], // Should fail with ERR_UNAUTHORIZED
-  })
-
-  // Test: Try double initialization (should fail)
-  .withSender(BFAKTORY_PROVIDER)
-  .addContractCall({
-    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
-    function_name: "initialize-bfaktory-pool",
-    function_args: [uintCV(500000000000000)], // Should fail with ERR_ALREADY_INITIALIZED
-  })
-
-  // Check user LP tokens
+  // Check user LP tokens before withdrawal
   .addEvalCode(
     `${DEPLOYER}.b-alex-single-faktory`,
     `(get-user-lp-tokens '${STX_USER_1})`
@@ -83,9 +59,74 @@ SimulationBuilder.new()
     `(get-user-lp-tokens '${STX_USER_2})`
   )
 
+  // NOW TEST WITHDRAWALS (since LOCK_PERIOD = u0)
+
+  // User 1 withdraws LP tokens (should work now)
+  .withSender(STX_USER_1)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens",
+    function_args: [],
+  })
+
+  // Check user 1 LP tokens after withdrawal (should be 0)
+  .addEvalCode(
+    `${DEPLOYER}.b-alex-single-faktory`,
+    `(get-user-lp-tokens '${STX_USER_1})`
+  )
+
+  // User 2 withdraws LP tokens (should work)
+  .withSender(STX_USER_2)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens",
+    function_args: [],
+  })
+
+  // Check user 2 LP tokens after withdrawal (should be 0)
+  .addEvalCode(
+    `${DEPLOYER}.b-alex-single-faktory`,
+    `(get-user-lp-tokens '${STX_USER_2})`
+  )
+
+  // Bfaktory provider withdraws remaining bfaktory tokens
+  .withSender(BFAKTORY_PROVIDER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-remaining-bfaktory",
+    function_args: [],
+  })
+
+  // Test error cases that should still fail:
+
+  // Try bfaktory provider depositing STX (should fail - unauthorized)
+  .withSender(BFAKTORY_PROVIDER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "deposit-stx-for-lp",
+    function_args: [uintCV(25000000)], // Should fail with ERR_UNAUTHORIZED
+  })
+
+  // Try double initialization (should fail)
+  .withSender(BFAKTORY_PROVIDER)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "initialize-bfaktory-pool",
+    function_args: [uintCV(500000000000000)], // Should fail with ERR_ALREADY_INITIALIZED
+  })
+
+  // Try withdrawing when user has no LP tokens (should fail)
+  .withSender(STX_USER_1)
+  .addContractCall({
+    contract_id: `${DEPLOYER}.b-alex-single-faktory`,
+    function_name: "withdraw-lp-tokens",
+    function_args: [], // Should fail with ERR_NO_DEPOSIT
+  })
+
   // Check final pool info
   .addEvalCode(`${DEPLOYER}.b-alex-single-faktory`, "(get-pool-info)")
 
   .run()
   .catch(console.error);
 // runs https://stxer.xyz/simulations/mainnet/56ba58e3a14b7fe0d56537da8dc6a406
+// all green https://stxer.xyz/simulations/mainnet/ead26f39cfbb884b817155f44b343cd2
