@@ -110,7 +110,7 @@
     (asserts! (> user-lp u0) ERR_NO_DEPOSIT)
     
     ;; Remove liquidity from Alex pool (sends both tokens to this contract)
-    (let ((user-percentage (div-down (* user-lp ONE_8) (var-get total-lp-tokens)))
+    (let ((user-percentage (div-down user-lp (var-get total-lp-tokens)))
           (remove-result (try! (as-contract (contract-call? 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.amm-pool-v2-01 
                                 reduce-position
                                 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM.token-wstx-v2

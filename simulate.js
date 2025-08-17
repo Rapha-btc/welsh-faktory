@@ -68,7 +68,7 @@ SimulationBuilder.new()
     function_args: [],
   })
 
-  // TEST BUG 2: User 1 withdraws (this will show the 100% withdrawal bug)
+  // TEST BUG 2: User 1 withdraws (this will show the percentage issue)
   .withSender(STX_USER_1)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -90,7 +90,7 @@ SimulationBuilder.new()
   // Check pool info after User 1 withdrawal
   .addEvalCode(`${DEPLOYER}.b-alex-single-faktory`, "(get-pool-info)")
 
-  // TEST BUG 2 CONTINUED: User 2 tries to withdraw (should fail because User 1 already withdrew everything)
+  // TEST BUG 2 CONTINUED: User 2 tries to withdraw
   .withSender(STX_USER_2)
   .addContractCall({
     contract_id: `${DEPLOYER}.b-alex-single-faktory`,
@@ -140,3 +140,5 @@ SimulationBuilder.new()
 // runs https://stxer.xyz/simulations/mainnet/56ba58e3a14b7fe0d56537da8dc6a406
 // all green https://stxer.xyz/simulations/mainnet/ead26f39cfbb884b817155f44b343cd2
 // https://stxer.xyz/simulations/mainnet/4c6ef8802df5d885633ea9078213b41a
+
+// all green now: https://stxer.xyz/simulations/mainnet/59962cd7656f4f74d1c7b071055b5280
